@@ -14,29 +14,32 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const dbFile = process.env.RENDER ? "/opt/render/data/chat.db" : "chat.db";
-const db = await open({ filename: dbFile, driver: sqlite3.Database });
+const db = await open({
+  filename: dbFile,
+  driver: sqlite3.Database
+});
 
 // --- Tables ---
 await db.run(`CREATE TABLE IF NOT EXISTS users (
   username TEXT PRIMARY KEY,
   password TEXT
 )`);
-
 await db.run(`CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user TEXT,
   message TEXT,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 )`);
-
 await db.run(`CREATE TABLE IF NOT EXISTS banned (
   user TEXT PRIMARY KEY,
   cookie TEXT
 )`);
 
 const mutedUsers = new Map();
+const onlineUsers = new Map(); // socket.id -> username
+const lastWhisper = new Map(); // last whisper sender per user
 
-// --- Auth API ---
+// --- Auth ---
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
   const hash = crypto.createHash("sha256").update(password).digest("hex");
@@ -65,9 +68,19 @@ app.post("/login", async (req, res) => {
 
 // --- Socket.IO ---
 io.on("connection", (socket) => {
-  console.log("User connected");
+  let username;
 
-  // Send chat history
+  // Identify user on login
+  socket.on("registerSocket", (data) => {
+    username = data.username;
+    socket.user = username;
+    onlineUsers.set(socket.id, username);
+
+    // Send online users list
+    io.emit("online-users", Array.from(onlineUsers.values()));
+  });
+
+  // Send last 50 messages
   (async () => {
     const messages = await db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
     socket.emit("chat-history", messages.reverse());
@@ -111,13 +124,46 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Whisper command
+    if (message.startsWith("/whisper ")) {
+      const parts = message.split(" ");
+      const targetUser = parts[1];
+      const msg = parts.slice(2).join(" ");
+      lastWhisper.set(targetUser, user);
+
+      io.sockets.sockets.forEach(s => {
+        if (s.user === targetUser || s.user === user || user === "DEV") {
+          s.emit("whisper", { from: user, to: targetUser, message: msg });
+        }
+      });
+      return;
+    }
+
+    // Reply command
+    if (message.startsWith("/reply ")) {
+      const msg = message.slice(7);
+      const targetUser = lastWhisper.get(user);
+      if (!targetUser) return;
+      lastWhisper.set(targetUser, user);
+
+      io.sockets.sockets.forEach(s => {
+        if (s.user === targetUser || s.user === user || user === "DEV") {
+          s.emit("whisper", { from: user, to: targetUser, message: msg });
+        }
+      });
+      return;
+    }
+
     // Normal message
     await db.run("INSERT INTO messages (user, message) VALUES (?, ?)", [user, message]);
     socket.user = user;
     io.emit("chat", { user, message });
   });
 
-  socket.on("disconnect", () => console.log("User disconnected"));
+  socket.on("disconnect", () => {
+    onlineUsers.delete(socket.id);
+    io.emit("online-users", Array.from(onlineUsers.values()));
+  });
 });
 
 server.listen(process.env.PORT || 3000, () => console.log("Server running"));
