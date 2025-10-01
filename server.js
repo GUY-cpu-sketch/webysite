@@ -1,62 +1,89 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import Database from "better-sqlite3";
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
 import cookieParser from "cookie-parser";
+import crypto from "crypto";
 
-// --- Config ---
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 app.use(cookieParser());
+app.use(express.json());
 app.use(express.static("public"));
 
-const dbPath = process.env.RENDER ? "/opt/render/data/chat.db" : "chat.db";
-const db = new Database(dbPath);
+const dbFile = process.env.RENDER ? "/opt/render/data/chat.db" : "chat.db";
+const db = await open({ filename: dbFile, driver: sqlite3.Database });
 
-// --- DB Setup ---
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user TEXT,
-    message TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`).run();
+// --- Tables ---
+await db.run(`CREATE TABLE IF NOT EXISTS users (
+  username TEXT PRIMARY KEY,
+  password TEXT
+)`);
 
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS banned (
-    user TEXT PRIMARY KEY,
-    cookie TEXT
-  )
-`).run();
+await db.run(`CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user TEXT,
+  message TEXT,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
 
-// --- In-memory muted users ---
-const mutedUsers = new Map(); // user -> timestamp when mute ends
+await db.run(`CREATE TABLE IF NOT EXISTS banned (
+  user TEXT PRIMARY KEY,
+  cookie TEXT
+)`);
+
+const mutedUsers = new Map();
+
+// --- Auth API ---
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+  const hash = crypto.createHash("sha256").update(password).digest("hex");
+  try {
+    await db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, hash]);
+    res.json({ success: true });
+  } catch {
+    res.json({ success: false, msg: "Username taken" });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const hash = crypto.createHash("sha256").update(password).digest("hex");
+  const user = await db.get("SELECT * FROM users WHERE username = ? AND password = ?", [username, hash]);
+  if (!user) return res.json({ success: false, msg: "Invalid credentials" });
+
+  const banned = await db.get("SELECT * FROM banned WHERE user = ?", [username]);
+  if (banned) {
+    res.cookie("banned", banned.cookie, { maxAge: 10 * 365 * 24 * 60 * 60 * 1000 });
+    return res.json({ success: false, msg: "You are banned" });
+  }
+
+  res.json({ success: true });
+});
 
 // --- Socket.IO ---
 io.on("connection", (socket) => {
   console.log("User connected");
 
   // Send chat history
-  const messages = db.prepare("SELECT * FROM messages ORDER BY id DESC LIMIT 50").all();
-  socket.emit("chat-history", messages.reverse());
+  (async () => {
+    const messages = await db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
+    socket.emit("chat-history", messages.reverse());
+  })();
 
-  // Handle messages
-  socket.on("chat", (data) => {
+  socket.on("chat", async (data) => {
     const { user, message } = data;
 
-    // Check if banned
-    if (socket.handshake.headers.cookie) {
-      const cookies = Object.fromEntries(socket.handshake.headers.cookie.split("; ").map(c => c.split("=")));
-      if (cookies.banned && cookies.banned === user) return;
-    }
+    // Check banned
+    const banned = await db.get("SELECT * FROM banned WHERE user = ?", [user]);
+    if (banned) return socket.disconnect(true);
 
-    // Check if muted
+    // Check muted
     if (mutedUsers.has(user)) {
-      const muteEnd = mutedUsers.get(user);
-      if (Date.now() < muteEnd) return;
-      else mutedUsers.delete(user);
+      if (Date.now() < mutedUsers.get(user)) return;
+      mutedUsers.delete(user);
     }
 
     // Admin commands
@@ -67,28 +94,25 @@ io.on("connection", (socket) => {
 
       switch (cmd) {
         case "/close":
-          io.sockets.sockets.forEach((s) => {
-            if (s.id === target || s.user === target) s.disconnect(true);
-          });
+          io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
           break;
         case "/mute":
-          let duration = 60000; // default 60s
+          let duration = 60000;
           if (parts[2]) duration = parseInt(parts[2]) * 1000;
           mutedUsers.set(target, Date.now() + duration);
           break;
         case "/ban":
           const cookieValue = `${target}-${Date.now()}`;
-          db.prepare("INSERT OR REPLACE INTO banned (user, cookie) VALUES (?, ?)").run(target, cookieValue);
-          io.sockets.sockets.forEach((s) => {
-            if (s.user === target) s.disconnect(true);
-          });
+          await db.run("INSERT OR REPLACE INTO banned (user, cookie) VALUES (?, ?)", [target, cookieValue]);
+          io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
+          socket.emit("ban-cookie", { user: target, cookie: cookieValue });
           break;
       }
-      return; // Don't broadcast admin command
+      return;
     }
 
     // Normal message
-    db.prepare("INSERT INTO messages (user, message) VALUES (?, ?)").run(user, message);
+    await db.run("INSERT INTO messages (user, message) VALUES (?, ?)", [user, message]);
     socket.user = user;
     io.emit("chat", { user, message });
   });
@@ -96,7 +120,4 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => console.log("User disconnected"));
 });
 
-// --- Start server ---
-server.listen(process.env.PORT || 3000, () => {
-  console.log("Server running");
-});
+server.listen(process.env.PORT || 3000, () => console.log("Server running"));
