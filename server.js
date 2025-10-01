@@ -70,17 +70,13 @@ app.post("/login", async (req, res) => {
 io.on("connection", (socket) => {
   let username;
 
-  // Identify user on login
   socket.on("registerSocket", (data) => {
     username = data.username;
     socket.user = username;
     onlineUsers.set(socket.id, username);
-
-    // Send online users list
     io.emit("online-users", Array.from(onlineUsers.values()));
   });
 
-  // Send last 50 messages
   (async () => {
     const messages = await db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
     socket.emit("chat-history", messages.reverse());
@@ -89,15 +85,11 @@ io.on("connection", (socket) => {
   socket.on("chat", async (data) => {
     const { user, message } = data;
 
-    // Check banned
     const banned = await db.get("SELECT * FROM banned WHERE user = ?", [user]);
     if (banned) return socket.disconnect(true);
 
-    // Check muted
-    if (mutedUsers.has(user)) {
-      if (Date.now() < mutedUsers.get(user)) return;
-      mutedUsers.delete(user);
-    }
+    if (mutedUsers.has(user) && Date.now() < mutedUsers.get(user)) return;
+    if (mutedUsers.has(user)) mutedUsers.delete(user);
 
     // Admin commands
     if (user === "DEV" && message.startsWith("/")) {
@@ -124,13 +116,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Whisper command
+    // Whisper
     if (message.startsWith("/whisper ")) {
       const parts = message.split(" ");
       const targetUser = parts[1];
       const msg = parts.slice(2).join(" ");
       lastWhisper.set(targetUser, user);
-
       io.sockets.sockets.forEach(s => {
         if (s.user === targetUser || s.user === user || user === "DEV") {
           s.emit("whisper", { from: user, to: targetUser, message: msg });
@@ -139,13 +130,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Reply command
+    // Reply
     if (message.startsWith("/reply ")) {
       const msg = message.slice(7);
       const targetUser = lastWhisper.get(user);
       if (!targetUser) return;
       lastWhisper.set(targetUser, user);
-
       io.sockets.sockets.forEach(s => {
         if (s.user === targetUser || s.user === user || user === "DEV") {
           s.emit("whisper", { from: user, to: targetUser, message: msg });
@@ -154,9 +144,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Normal message
     await db.run("INSERT INTO messages (user, message) VALUES (?, ?)", [user, message]);
-    socket.user = user;
     io.emit("chat", { user, message });
   });
 
