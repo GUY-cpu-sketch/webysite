@@ -1,27 +1,23 @@
-<div id="auth">
-  <input id="username" placeholder="Username" />
-  <input id="password" type="password" placeholder="Password" />
-  <button id="register">Register</button>
-  <button id="login">Login</button>
-</div>
-
-<div id="chat" style="display:none;">
-  <div style="display:flex;">
-    <div id="messages" style="max-height:400px; overflow-y:auto; flex:3; margin-right:10px;"></div>
-    <div id="admin-panel" style="flex:1; max-height:400px; overflow-y:auto; background:#333; color:white; padding:5px;">
-      <h4>Admin Panel (DEV only)</h4>
-      <div id="online-users"></div>
-      <div id="whispers"></div>
-    </div>
-  </div>
-  <input id="input" placeholder="Message..." style="width:100%; margin-top:5px;" />
-</div>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Render Chat App</title>
 <style>
   body {
-    background-color: #808080;
+    background-color: #808080; /* gray background */
     font-family: Arial, sans-serif;
     color: white;
+    margin: 0;
+    padding: 0;
+  }
+  #auth, #chat {
+    padding: 10px;
+  }
+  input, button {
+    margin: 5px 0;
+    padding: 6px;
+    font-size: 14px;
   }
   #messages div, #whispers div {
     padding: 4px 6px;
@@ -33,14 +29,58 @@
     color: black;
   }
   .whisper {
-    background-color: #ffff66;
+    background-color: #ffff66; /* yellow highlight */
     color: black;
+  }
+  #admin-panel {
+    background: #333;
+    color: white;
+    padding: 5px;
+    overflow-y: auto;
   }
   #admin-panel h4 {
     margin: 2px 0;
     font-size: 14px;
   }
+  #chat-wrapper {
+    display: flex;
+    gap: 10px;
+  }
+  #messages {
+    flex: 3;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  #admin-panel {
+    flex: 1;
+    max-height: 400px;
+  }
+  #input {
+    width: 100%;
+    margin-top: 5px;
+  }
 </style>
+</head>
+<body>
+
+<div id="auth">
+  <input id="username" placeholder="Username" />
+  <input id="password" type="password" placeholder="Password" />
+  <button id="register">Register</button>
+  <button id="login">Login</button>
+</div>
+
+<div id="chat" style="display:none;">
+  <div id="chat-wrapper">
+    <div id="messages"></div>
+    <div id="admin-panel">
+      <h4>Admin Panel (DEV only)</h4>
+      <div id="online-users"></div>
+      <div id="whispers"></div>
+    </div>
+  </div>
+  <input id="input" placeholder="Message..." />
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -56,6 +96,7 @@ const messagesDiv = document.getElementById("messages");
 const onlineDiv = document.getElementById("online-users");
 const whispersDiv = document.getElementById("whispers");
 
+// --- Auth ---
 document.getElementById("register").onclick = async () => {
   const res = await fetch("/register", {
     method: "POST",
@@ -81,13 +122,16 @@ document.getElementById("login").onclick = async () => {
   socket.emit("registerSocket", { username });
 };
 
+// --- Socket.IO Events ---
 socket.on("chat-history", messages => messages.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
 socket.on("chat", data => appendMessage(`${data.user}: ${data.message}`, 'normal'));
+
 socket.on("whisper", data => {
   appendMessage(`[Whisper] ${data.from} -> ${data.to}: ${data.message}`, 'whisper');
   if(username === "DEV") {
     const div = document.createElement("div");
     div.textContent = `[Whisper] ${data.from} -> ${data.to}: ${data.message}`;
+    div.className = "whisper";
     whispersDiv.appendChild(div);
   }
 });
@@ -104,6 +148,7 @@ socket.on("ban-cookie", data => {
   }
 });
 
+// --- Message Input ---
 input.addEventListener("keypress", e => {
   if (e.key === "Enter" && input.value.trim()) {
     socket.emit("chat", { user: username, message: input.value.trim() });
@@ -111,6 +156,7 @@ input.addEventListener("keypress", e => {
   }
 });
 
+// --- Helper ---
 function appendMessage(msg, type) {
   const div = document.createElement("div");
   div.textContent = msg;
@@ -119,3 +165,5 @@ function appendMessage(msg, type) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 </script>
+</body>
+</html>
