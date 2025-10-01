@@ -3,12 +3,76 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Admin Panel</h1>
-  <ul id="log"></ul>
+  <div class="container">
+    <h1>Admin Panel</h1>
+    <div id="adminControls">
+      <h3>Commands</h3>
+      <input type="text" id="targetUser" placeholder="Target username">
+      <input type="number" id="duration" placeholder="Duration (sec)">
+      <button id="muteBtn">Mute</button>
+      <button id="banBtn">Ban</button>
+      <button id="closeBtn">Disconnect</button>
+    </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/main.js"></script>
+    <h3>Chat Messages</h3>
+    <div id="adminChat" class="chat-box"></div>
+
+    <p><a href="chat.html">Go to Chat</a></p>
+  </div>
+
+  <script src="main.js"></script>
+  <script>
+    // Check admin cookie
+    const cookies = document.cookie.split("; ").reduce((acc, cur) => {
+      const [k, v] = cur.split("=");
+      acc[k] = v;
+      return acc;
+    }, {});
+    if (!cookies.admin) {
+      alert("Access denied: Admins only");
+      window.location.href = "index.html";
+    }
+
+    const socket = io();
+
+    // Run commands buttons
+    const targetInput = document.getElementById("targetUser");
+    const durationInput = document.getElementById("duration");
+    document.getElementById("muteBtn").addEventListener("click", () => {
+      const target = targetInput.value;
+      const dur = durationInput.value || 60;
+      socket.emit("chat", { user: "DEV", message: `/mute ${target} ${dur}` });
+    });
+
+    document.getElementById("banBtn").addEventListener("click", () => {
+      const target = targetInput.value;
+      socket.emit("chat", { user: "DEV", message: `/ban ${target}` });
+    });
+
+    document.getElementById("closeBtn").addEventListener("click", () => {
+      const target = targetInput.value;
+      socket.emit("chat", { user: "DEV", message: `/close ${target}` });
+    });
+
+    // Stream all chat messages to admin
+    const adminChat = document.getElementById("adminChat");
+    socket.on("chat", (data) => {
+      const p = document.createElement("p");
+      p.textContent = `${data.user}: ${data.message}`;
+      adminChat.appendChild(p);
+      adminChat.scrollTop = adminChat.scrollHeight;
+    });
+
+    // Whispers and replies
+    socket.on("whisper", (data) => {
+      const p = document.createElement("p");
+      p.textContent = `[WHISPER] ${data.from} -> ${data.to}: ${data.message}`;
+      adminChat.appendChild(p);
+      adminChat.scrollTop = adminChat.scrollHeight;
+    });
+  </script>
 </body>
 </html>
