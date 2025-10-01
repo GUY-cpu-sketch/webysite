@@ -2,32 +2,111 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Chat Login/Register</title>
+  <title>Chat Landing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .rules {
+      background-color: #eee;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .agree-section {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .auth-area {
+      background-color: black;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+    }
+
+    .auth-area a {
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      margin: 0 10px;
+    }
+
+    .auth-area a:hover {
+      text-decoration: underline;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <h1>Login or Register</h1>
-  <form id="authForm">
-    <input type="text" id="username" placeholder="Username" required>
-    <input type="password" id="password" placeholder="Password" required>
-    <button type="submit">Submit</button>
-  </form>
+  <div class="container">
+    <h1>Welcome to Chat</h1>
+
+    <div class="rules">
+      <h3>Rules</h3>
+      <ol>
+        <li>No spamming.</li>
+        <li>Respect other users.</li>
+        <li>No offensive language.</li>
+        <li>Follow admin instructions.</li>
+        <li>Use the chat responsibly.</li>
+      </ol>
+    </div>
+
+    <div class="agree-section">
+      <input type="checkbox" id="agreeRules">
+      <label for="agreeRules">I agree to follow the rules</label><br>
+      <button id="continueBtn" disabled>Continue</button>
+    </div>
+
+    <div class="auth-area" id="authLinks" style="display:none;">
+      <a href="login.html">Login</a>
+      <a href="register.html">Register</a>
+    </div>
+  </div>
 
   <script>
-    const form = document.getElementById("authForm");
-    form.addEventListener("submit", async e => {
-      e.preventDefault();
-      const username = document.getElementById("username").value;
-      const password = document.getElementById("password").value;
+    const agreeCheckbox = document.getElementById("agreeRules");
+    const continueBtn = document.getElementById("continueBtn");
+    const authLinks = document.getElementById("authLinks");
 
-      const endpoint = location.pathname.includes("register") ? "/register" : "/login";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if (data.success) location.href = "/chat.html";
-      else alert(data.msg);
+    agreeCheckbox.addEventListener("change", () => {
+      continueBtn.disabled = !agreeCheckbox.checked;
+    });
+
+    continueBtn.addEventListener("click", () => {
+      if (agreeCheckbox.checked) {
+        authLinks.style.display = "block";
+        continueBtn.style.display = "none";
+        agreeCheckbox.disabled = true;
+      }
     });
   </script>
 </body>
