@@ -1,0 +1,121 @@
+<div id="auth">
+  <input id="username" placeholder="Username" />
+  <input id="password" type="password" placeholder="Password" />
+  <button id="register">Register</button>
+  <button id="login">Login</button>
+</div>
+
+<div id="chat" style="display:none;">
+  <div style="display:flex;">
+    <div id="messages" style="max-height:400px; overflow-y:auto; flex:3; margin-right:10px;"></div>
+    <div id="admin-panel" style="flex:1; max-height:400px; overflow-y:auto; background:#333; color:white; padding:5px;">
+      <h4>Admin Panel (DEV only)</h4>
+      <div id="online-users"></div>
+      <div id="whispers"></div>
+    </div>
+  </div>
+  <input id="input" placeholder="Message..." style="width:100%; margin-top:5px;" />
+</div>
+
+<style>
+  body {
+    background-color: #808080;
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+  #messages div, #whispers div {
+    padding: 4px 6px;
+    margin: 2px 0;
+    border-radius: 4px;
+  }
+  .normal {
+    background-color: #ffffff;
+    color: black;
+  }
+  .whisper {
+    background-color: #ffff66;
+    color: black;
+  }
+  #admin-panel h4 {
+    margin: 2px 0;
+    font-size: 14px;
+  }
+</style>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let username;
+
+const authDiv = document.getElementById("auth");
+const chatDiv = document.getElementById("chat");
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
+const input = document.getElementById("input");
+const messagesDiv = document.getElementById("messages");
+const onlineDiv = document.getElementById("online-users");
+const whispersDiv = document.getElementById("whispers");
+
+document.getElementById("register").onclick = async () => {
+  const res = await fetch("/register", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
+  });
+  const data = await res.json();
+  alert(data.success ? "Registered!" : data.msg);
+};
+
+document.getElementById("login").onclick = async () => {
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
+  });
+  const data = await res.json();
+  if (!data.success) return alert(data.msg);
+  username = usernameInput.value;
+  authDiv.style.display = "none";
+  chatDiv.style.display = "block";
+
+  socket.emit("registerSocket", { username });
+};
+
+socket.on("chat-history", messages => messages.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
+socket.on("chat", data => appendMessage(`${data.user}: ${data.message}`, 'normal'));
+socket.on("whisper", data => {
+  appendMessage(`[Whisper] ${data.from} -> ${data.to}: ${data.message}`, 'whisper');
+  if(username === "DEV") {
+    const div = document.createElement("div");
+    div.textContent = `[Whisper] ${data.from} -> ${data.to}: ${data.message}`;
+    whispersDiv.appendChild(div);
+  }
+});
+
+socket.on("online-users", users => {
+  onlineDiv.innerHTML = "<b>Online:</b> " + users.join(", ");
+});
+
+socket.on("ban-cookie", data => {
+  if (username === data.user) {
+    document.cookie = `banned=${data.cookie}; path=/; max-age=${10*365*24*60*60}`;
+    alert("You have been banned!");
+    location.reload();
+  }
+});
+
+input.addEventListener("keypress", e => {
+  if (e.key === "Enter" && input.value.trim()) {
+    socket.emit("chat", { user: username, message: input.value.trim() });
+    input.value = "";
+  }
+});
+
+function appendMessage(msg, type) {
+  const div = document.createElement("div");
+  div.textContent = msg;
+  div.className = type;
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+</script>
