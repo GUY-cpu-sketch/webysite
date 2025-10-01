@@ -9,15 +9,13 @@ import crypto from "crypto";
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.static("public"));
 
 const dbFile = process.env.RENDER ? "/opt/render/data/chat.db" : "chat.db";
-const db = await open({
-  filename: dbFile,
-  driver: sqlite3.Database
-});
+const db = await open({ filename: dbFile, driver: sqlite3.Database });
 
 // --- Tables ---
 await db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -36,7 +34,7 @@ await db.run(`CREATE TABLE IF NOT EXISTS banned (
 )`);
 
 const mutedUsers = new Map();
-const onlineUsers = new Map();
+const onlineUsers = new Map(); // socket.id -> username
 const lastWhisper = new Map();
 
 // --- Auth ---
@@ -54,10 +52,10 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const hash = crypto.createHash("sha256").update(password).digest("hex");
-  const user = await db.get("SELECT * FROM users WHERE username = ? AND password = ?", [username, hash]);
+  const user = await db.get("SELECT * FROM users WHERE username=? AND password=?", [username, hash]);
   if (!user) return res.json({ success: false, msg: "Invalid credentials" });
 
-  const banned = await db.get("SELECT * FROM banned WHERE user = ?", [username]);
+  const banned = await db.get("SELECT * FROM banned WHERE user=?", [username]);
   if (banned) {
     res.cookie("banned", banned.cookie, { maxAge: 10 * 365 * 24 * 60 * 60 * 1000 });
     return res.json({ success: false, msg: "You are banned" });
@@ -85,7 +83,7 @@ io.on("connection", (socket) => {
   socket.on("chat", async (data) => {
     const { user, message } = data;
 
-    const banned = await db.get("SELECT * FROM banned WHERE user = ?", [user]);
+    const banned = await db.get("SELECT * FROM banned WHERE user=?", [user]);
     if (banned) return socket.disconnect(true);
 
     if (mutedUsers.has(user) && Date.now() < mutedUsers.get(user)) return;
