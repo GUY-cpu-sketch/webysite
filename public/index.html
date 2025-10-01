@@ -5,7 +5,7 @@
 <title>Render Chat App</title>
 <style>
   body {
-    background-color: #808080; /* gray background */
+    background-color: #808080; /* gray */
     font-family: Arial, sans-serif;
     color: white;
     margin: 0;
@@ -29,8 +29,16 @@
     color: black;
   }
   .whisper {
-    background-color: #ffff66; /* yellow highlight */
+    background-color: #ffff66;
     color: black;
+  }
+  .admin {
+    font-weight: bold;
+    color: #ff9900; /* orange for admin names */
+  }
+  .muted {
+    opacity: 0.5;
+    font-style: italic;
   }
   #admin-panel {
     background: #333;
@@ -86,6 +94,7 @@
 <script>
 const socket = io();
 let username;
+const adminName = "DEV";
 
 const authDiv = document.getElementById("auth");
 const chatDiv = document.getElementById("chat");
@@ -118,17 +127,16 @@ document.getElementById("login").onclick = async () => {
   username = usernameInput.value;
   authDiv.style.display = "none";
   chatDiv.style.display = "block";
-
   socket.emit("registerSocket", { username });
 };
 
-// --- Socket.IO Events ---
-socket.on("chat-history", messages => messages.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
-socket.on("chat", data => appendMessage(`${data.user}: ${data.message}`, 'normal'));
+// --- Socket.IO ---
+socket.on("chat-history", messages => messages.forEach(m => appendMessage(m.user, m.message)));
+socket.on("chat", data => appendMessage(data.user, data.message));
 
 socket.on("whisper", data => {
-  appendMessage(`[Whisper] ${data.from} -> ${data.to}: ${data.message}`, 'whisper');
-  if(username === "DEV") {
+  appendMessage(data.from, `[Whisper] -> ${data.to}: ${data.message}`, true);
+  if(username === adminName) {
     const div = document.createElement("div");
     div.textContent = `[Whisper] ${data.from} -> ${data.to}: ${data.message}`;
     div.className = "whisper";
@@ -137,7 +145,7 @@ socket.on("whisper", data => {
 });
 
 socket.on("online-users", users => {
-  onlineDiv.innerHTML = "<b>Online:</b> " + users.join(", ");
+  onlineDiv.innerHTML = "<b>Online:</b> " + users.map(u => u === adminName ? `<span class="admin">${u}</span>` : u).join(", ");
 });
 
 socket.on("ban-cookie", data => {
@@ -156,11 +164,13 @@ input.addEventListener("keypress", e => {
   }
 });
 
-// --- Helper ---
-function appendMessage(msg, type) {
+// --- Helpers ---
+function appendMessage(user, msg, isWhisper=false) {
   const div = document.createElement("div");
-  div.textContent = msg;
-  div.className = type;
+  let classes = isWhisper ? "whisper" : "normal";
+  if(user === adminName) classes += " admin";
+  div.className = classes;
+  div.textContent = user === adminName ? `[ADMIN] ${user}: ${msg}` : `${user}: ${msg}`;
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
