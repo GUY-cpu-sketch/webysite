@@ -36,8 +36,8 @@ await db.run(`CREATE TABLE IF NOT EXISTS banned (
 )`);
 
 const mutedUsers = new Map();
-const onlineUsers = new Map(); // socket.id -> username
-const lastWhisper = new Map(); // last whisper sender per user
+const onlineUsers = new Map();
+const lastWhisper = new Map();
 
 // --- Auth ---
 app.post("/register", async (req, res) => {
