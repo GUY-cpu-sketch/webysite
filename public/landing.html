@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Landing</title>
+</head>
+<body>
+<h1>Welcome to Chat</h1>
+
+<h2>Register</h2>
+<form id="registerForm">
+  <input type="text" placeholder="Username" name="username" required>
+  <input type="password" placeholder="Password" name="password" required>
+  <button type="submit">Register</button>
+</form>
+
+<h2>Login</h2>
+<form id="loginForm">
+  <input type="text" placeholder="Username" name="username" required>
+  <input type="password" placeholder="Password" name="password" required>
+  <button type="submit">Login</button>
+</form>
+
+<script>
+const registerForm = document.getElementById("registerForm");
+registerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const formData = Object.fromEntries(new FormData(registerForm));
+  const res = await fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(formData)
+  }).then(r => r.json());
+
+  if (res.success) location.href = "/chat";
+  else alert(res.msg);
+});
+
+const loginForm = document.getElementById("loginForm");
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const formData = Object.fromEntries(new FormData(loginForm));
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(formData)
+  }).then(r => r.json());
+
+  if (res.success) location.href = "/chat";
+  else alert(res.msg);
+});
+</script>
+</body>
+</html>
