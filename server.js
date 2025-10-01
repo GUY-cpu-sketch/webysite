@@ -1,48 +1,47 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
+import pkg from "pg";
+const { Pool } = pkg;
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.static("public"));
 
-const dbFile = process.env.RENDER ? "/opt/render/data/chat.db" : "chat.db";
-const db = await open({ filename: dbFile, driver: sqlite3.Database });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // --- Tables ---
-await db.run(`CREATE TABLE IF NOT EXISTS users (
+await pool.query(`CREATE TABLE IF NOT EXISTS users (
   username TEXT PRIMARY KEY,
   password TEXT
 )`);
-await db.run(`CREATE TABLE IF NOT EXISTS messages (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+await pool.query(`CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
   user TEXT,
   message TEXT,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`);
-await db.run(`CREATE TABLE IF NOT EXISTS banned (
+await pool.query(`CREATE TABLE IF NOT EXISTS banned (
   user TEXT PRIMARY KEY,
   cookie TEXT
 )`);
 
+// --- Runtime maps ---
 const mutedUsers = new Map();
 const onlineUsers = new Map(); // socket.id -> username
-const lastWhisper = new Map();
+const lastWhisper = new Map(); // last whisper sender per user
 
 // --- Auth ---
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
   const hash = crypto.createHash("sha256").update(password).digest("hex");
   try {
-    await db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, hash]);
+    await pool.query("INSERT INTO users(username,password) VALUES($1,$2)", [username, hash]);
     res.json({ success: true });
   } catch {
     res.json({ success: false, msg: "Username taken" });
@@ -52,12 +51,12 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const hash = crypto.createHash("sha256").update(password).digest("hex");
-  const user = await db.get("SELECT * FROM users WHERE username=? AND password=?", [username, hash]);
-  if (!user) return res.json({ success: false, msg: "Invalid credentials" });
+  const result = await pool.query("SELECT * FROM users WHERE username=$1 AND password=$2", [username, hash]);
+  if (result.rowCount === 0) return res.json({ success: false, msg: "Invalid credentials" });
 
-  const banned = await db.get("SELECT * FROM banned WHERE user=?", [username]);
-  if (banned) {
-    res.cookie("banned", banned.cookie, { maxAge: 10 * 365 * 24 * 60 * 60 * 1000 });
+  const banned = await pool.query("SELECT * FROM banned WHERE user=$1", [username]);
+  if (banned.rowCount > 0) {
+    res.cookie("banned", banned.rows[0].cookie, { maxAge: 10 * 365 * 24 * 60 * 60 * 1000 });
     return res.json({ success: false, msg: "You are banned" });
   }
 
@@ -68,23 +67,20 @@ app.post("/login", async (req, res) => {
 io.on("connection", (socket) => {
   let username;
 
-  socket.on("registerSocket", (data) => {
+  socket.on("registerSocket", async (data) => {
     username = data.username;
     socket.user = username;
     onlineUsers.set(socket.id, username);
     io.emit("online-users", Array.from(onlineUsers.values()));
+
+    // Send last 50 messages
+    const messages = await pool.query("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
+    socket.emit("chat-history", messages.rows.reverse());
   });
 
-  (async () => {
-    const messages = await db.all("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
-    socket.emit("chat-history", messages.reverse());
-  })();
-
-  socket.on("chat", async (data) => {
-    const { user, message } = data;
-
-    const banned = await db.get("SELECT * FROM banned WHERE user=?", [user]);
-    if (banned) return socket.disconnect(true);
+  socket.on("chat", async ({ user, message }) => {
+    const banned = await pool.query("SELECT * FROM banned WHERE user=$1", [user]);
+    if (banned.rowCount > 0) return socket.disconnect(true);
 
     if (mutedUsers.has(user) && Date.now() < mutedUsers.get(user)) return;
     if (mutedUsers.has(user)) mutedUsers.delete(user);
@@ -106,7 +102,7 @@ io.on("connection", (socket) => {
           break;
         case "/ban":
           const cookieValue = `${target}-${Date.now()}`;
-          await db.run("INSERT OR REPLACE INTO banned (user, cookie) VALUES (?, ?)", [target, cookieValue]);
+          await pool.query("INSERT INTO banned(user,cookie) VALUES($1,$2) ON CONFLICT(user) DO UPDATE SET cookie=$2", [target, cookieValue]);
           io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
           socket.emit("ban-cookie", { user: target, cookie: cookieValue });
           break;
@@ -142,7 +138,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    await db.run("INSERT INTO messages (user, message) VALUES (?, ?)", [user, message]);
+    await pool.query("INSERT INTO messages(user,message) VALUES($1,$2)", [user, message]);
     io.emit("chat", { user, message });
   });
 
