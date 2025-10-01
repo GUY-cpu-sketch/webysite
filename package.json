@@ -1,17 +1,16 @@
 {
-  "name": "webysite",
+  "name": "render-chat-app",
   "version": "1.0.0",
-  "description": "Real-time chat app with admin commands",
+  "description": "Chat app with login, admin commands, and bans",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npm install"
+    "start": "node server.js"
   },
   "dependencies": {
-    "better-sqlite3": "^8.3.0",
     "express": "^4.18.2",
     "socket.io": "^4.8.1",
+    "sqlite3": "^5.2.12",
     "cookie-parser": "^1.4.6"
   }
 }
