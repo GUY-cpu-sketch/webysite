@@ -2,71 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Render Chat App</title>
+<title>Chat App</title>
 <style>
   body {
-    background-color: #808080; /* gray */
+    background: #808080;
     font-family: Arial, sans-serif;
     color: white;
-    margin: 0;
-    padding: 0;
-  }
-  #auth, #chat {
-    padding: 10px;
-  }
-  input, button {
-    margin: 5px 0;
-    padding: 6px;
-    font-size: 14px;
   }
   #messages div, #whispers div {
     padding: 4px 6px;
     margin: 2px 0;
     border-radius: 4px;
   }
-  .normal {
-    background-color: #ffffff;
-    color: black;
-  }
-  .whisper {
-    background-color: #ffff66;
-    color: black;
-  }
-  .admin {
-    font-weight: bold;
-    color: #ff9900; /* orange for admin names */
-  }
-  .muted {
-    opacity: 0.5;
-    font-style: italic;
-  }
-  #admin-panel {
-    background: #333;
-    color: white;
-    padding: 5px;
-    overflow-y: auto;
-  }
-  #admin-panel h4 {
-    margin: 2px 0;
-    font-size: 14px;
-  }
-  #chat-wrapper {
-    display: flex;
-    gap: 10px;
-  }
-  #messages {
-    flex: 3;
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  #admin-panel {
-    flex: 1;
-    max-height: 400px;
-  }
-  #input {
-    width: 100%;
-    margin-top: 5px;
-  }
+  .normal { background: #fff; color: black; }
+  .whisper { background: #ffff66; color: black; }
+  #admin-panel { background: #333; color: white; padding: 5px; }
+  #admin-panel h4 { margin: 2px 0; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -79,22 +30,21 @@
 </div>
 
 <div id="chat" style="display:none;">
-  <div id="chat-wrapper">
-    <div id="messages"></div>
-    <div id="admin-panel">
+  <div style="display:flex;">
+    <div id="messages" style="max-height:400px; overflow-y:auto; flex:3; margin-right:10px;"></div>
+    <div id="admin-panel" style="flex:1; max-height:400px; overflow-y:auto;">
       <h4>Admin Panel (DEV only)</h4>
       <div id="online-users"></div>
       <div id="whispers"></div>
     </div>
   </div>
-  <input id="input" placeholder="Message..." />
+  <input id="input" placeholder="Message..." style="width:100%; margin-top:5px;" />
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
 let username;
-const adminName = "DEV";
 
 const authDiv = document.getElementById("auth");
 const chatDiv = document.getElementById("chat");
@@ -105,12 +55,10 @@ const messagesDiv = document.getElementById("messages");
 const onlineDiv = document.getElementById("online-users");
 const whispersDiv = document.getElementById("whispers");
 
-// --- Auth ---
 document.getElementById("register").onclick = async () => {
   const res = await fetch("/register", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username: usernameInput.value, password: passwordInput.value})
   });
   const data = await res.json();
   alert(data.success ? "Registered!" : data.msg);
@@ -118,34 +66,30 @@ document.getElementById("register").onclick = async () => {
 
 document.getElementById("login").onclick = async () => {
   const res = await fetch("/login", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username: usernameInput.value, password: passwordInput.value})
   });
   const data = await res.json();
   if (!data.success) return alert(data.msg);
   username = usernameInput.value;
-  authDiv.style.display = "none";
-  chatDiv.style.display = "block";
+  authDiv.style.display="none";
+  chatDiv.style.display="block";
   socket.emit("registerSocket", { username });
 };
 
-// --- Socket.IO ---
-socket.on("chat-history", messages => messages.forEach(m => appendMessage(m.user, m.message)));
-socket.on("chat", data => appendMessage(data.user, data.message));
-
+socket.on("chat-history", msgs => msgs.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
+socket.on("chat", data => appendMessage(`${data.user}: ${data.message}`, 'normal'));
 socket.on("whisper", data => {
-  appendMessage(data.from, `[Whisper] -> ${data.to}: ${data.message}`, true);
-  if(username === adminName) {
+  appendMessage(`[Whisper] ${data.from} -> ${data.to}: ${data.message}`, 'whisper');
+  if(username === "DEV") {
     const div = document.createElement("div");
     div.textContent = `[Whisper] ${data.from} -> ${data.to}: ${data.message}`;
-    div.className = "whisper";
     whispersDiv.appendChild(div);
   }
 });
 
 socket.on("online-users", users => {
-  onlineDiv.innerHTML = "<b>Online:</b> " + users.map(u => u === adminName ? `<span class="admin">${u}</span>` : u).join(", ");
+  onlineDiv.innerHTML = "<b>Online:</b> " + users.join(", ");
 });
 
 socket.on("ban-cookie", data => {
@@ -156,23 +100,19 @@ socket.on("ban-cookie", data => {
   }
 });
 
-// --- Message Input ---
 input.addEventListener("keypress", e => {
-  if (e.key === "Enter" && input.value.trim()) {
+  if(e.key==="Enter" && input.value.trim()){
     socket.emit("chat", { user: username, message: input.value.trim() });
-    input.value = "";
+    input.value="";
   }
 });
 
-// --- Helpers ---
-function appendMessage(user, msg, isWhisper=false) {
-  const div = document.createElement("div");
-  let classes = isWhisper ? "whisper" : "normal";
-  if(user === adminName) classes += " admin";
-  div.className = classes;
-  div.textContent = user === adminName ? `[ADMIN] ${user}: ${msg}` : `${user}: ${msg}`;
+function appendMessage(msg,type){
+  const div=document.createElement("div");
+  div.textContent=msg;
+  div.className=type;
   messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.scrollTop=messagesDiv.scrollHeight;
 }
 </script>
 </body>
