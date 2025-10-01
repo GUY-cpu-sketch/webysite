@@ -1,31 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin</title>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
 </head>
 <body>
-<h1>Admin Dashboard</h1>
+  <h1>Admin Panel</h1>
+  <ul id="log"></ul>
 
-<h3>Chat / Commands Log:</h3>
-<ul id="log"></ul>
-
-<script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io();
-const cookie = document.cookie.split("; ").find(c => c.startsWith("admin="))?.split("=")[1];
-if (!cookie || cookie !== "ADMINSECRET") { // same as server adminCookie
-  document.body.innerHTML = "Forbidden";
-}
-
-const log = document.getElementById("log");
-socket.on("admin-log", (data) => {
-  const li = document.createElement("li");
-  if (data.timestamp) li.textContent = `[${new Date(data.timestamp).toLocaleTimeString()}] ${data.user}: ${data.message}`;
-  else li.textContent = `${data.user}: ${data.message}`;
-  log.appendChild(li);
-});
-</script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/main.js"></script>
 </body>
 </html>
