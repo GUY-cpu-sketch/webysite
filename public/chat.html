@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WebChat</title>
+<style>
+body { font-family: Arial; margin: 0; padding: 20px; background: #f9f9f9; }
+#messages { border: 1px solid #ddd; padding: 10px; height: 400px; overflow-y: auto; }
+input { padding: 8px; width: 70%; }
+button { padding: 8px; }
+.whisper { color: orange; }
+.reply { color: purple; }
+</style>
+</head>
+<body>
+<h2>Chat Room</h2>
+<div id="messages"></div>
+<input id="msgInput" placeholder="Type a message">
+<button onclick="sendMessage()">Send</button>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let username = prompt("Enter your username");
+
+socket.emit("registerSocket", { username });
+
+function addMessage(data){
+  const p = document.createElement('p');
+  if(data.type === 'whisper') p.textContent = `${data.from} → ${data.to}: ${data.message}`;
+  else if(data.type === 'reply') p.textContent = `${data.from} replied to ${data.to}: ${data.message}`;
+  else p.textContent = `${data.user}: ${data.message}`;
+  
+  if(data.type) p.className = data.type;
+  document.getElementById('messages').appendChild(p);
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+}
+
+socket.on('chat-history', msgs => msgs.forEach(addMessage));
+socket.on('chat', addMessage);
+socket.on('whisper', addMessage);
+socket.on('online-users', users => console.log("Online:", users));
+
+function sendMessage(){
+  const msg = document.getElementById('msgInput').value;
+  socket.emit('chat', { user: username, message: msg });
+  document.getElementById('msgInput').value = '';
+}
+</script>
+</body>
+</html>
