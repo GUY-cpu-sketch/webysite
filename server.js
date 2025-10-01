@@ -13,58 +13,33 @@ app.use(express.json());
 app.use(express.static("public"));
 
 // --- In-memory storage ---
-const users = new Map(); // username -> { passwordHash }
-const banned = new Map(); // username -> cookie
-const mutedUsers = new Map(); // username -> timestamp
+const users = new Map(); // username -> password hash
 const onlineUsers = new Map(); // socket.id -> username
-const lastWhisper = new Map(); // last whisper sender per user
-const messages = []; // { user, message, timestamp }
-const adminCookie = "ADMINSECRET"; // change this to your secret
+const mutedUsers = new Map();
+const lastWhisper = new Map();
+
+// --- Admin cookie ---
+const ADMIN_SECRET = "ADMINSECRET";
 
 // --- Routes ---
-app.get("/", (req, res) => {
-  res.sendFile("landing.html", { root: "public" });
-});
-
-app.get("/chat", (req, res) => {
-  const username = req.cookies.username;
-  if (!username || !users.has(username) || banned.has(username)) {
-    return res.redirect("/");
-  }
-  res.sendFile("chat.html", { root: "public" });
-});
-
-app.get("/admin", (req, res) => {
-  const cookie = req.cookies.admin;
-  if (cookie !== adminCookie) return res.status(403).send("Forbidden");
-  res.sendFile("admin.html", { root: "public" });
-});
-
-// --- Auth ---
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
   if (users.has(username)) return res.json({ success: false, msg: "Username taken" });
-
   const hash = crypto.createHash("sha256").update(password).digest("hex");
-  users.set(username, { passwordHash: hash });
-  res.cookie("username", username, { maxAge: 7 * 24 * 60 * 60 * 1000 });
+  users.set(username, hash);
   res.json({ success: true });
 });
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  const user = users.get(username);
-  if (!user) return res.json({ success: false, msg: "Invalid credentials" });
-
   const hash = crypto.createHash("sha256").update(password).digest("hex");
-  if (hash !== user.passwordHash) return res.json({ success: false, msg: "Invalid credentials" });
+  if (!users.has(username) || users.get(username) !== hash)
+    return res.json({ success: false, msg: "Invalid credentials" });
 
-  if (banned.has(username)) {
-    res.cookie("banned", banned.get(username), { maxAge: 10 * 365 * 24 * 60 * 60 * 1000 });
-    return res.json({ success: false, msg: "You are banned" });
-  }
+  // Admin login
+  if (username === "DEV") res.cookie("admin", ADMIN_SECRET, { maxAge: 24*60*60*1000 });
 
-  res.cookie("username", username, { maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie("username", username, { maxAge: 24*60*60*1000 });
   res.json({ success: true });
 });
 
@@ -76,16 +51,16 @@ io.on("connection", (socket) => {
     username = data.username;
     socket.user = username;
     onlineUsers.set(socket.id, username);
-    io.emit("online-users", Array.from(onlineUsers.values()));
 
-    // send last 50 messages
-    socket.emit("chat-history", messages.slice(-50));
+    io.emit("online-users", Array.from(onlineUsers.values()));
   });
+
+  // Send chat history (we only keep last 50 messages in memory)
+  socket.chatHistory = socket.chatHistory || [];
+  socket.chatHistory.forEach(msg => socket.emit("chat-history", msg));
 
   socket.on("chat", (data) => {
     const { user, message } = data;
-
-    if (!user || banned.has(user)) return socket.disconnect(true);
 
     if (mutedUsers.has(user) && Date.now() < mutedUsers.get(user)) return;
     if (mutedUsers.has(user)) mutedUsers.delete(user);
@@ -105,15 +80,10 @@ io.on("connection", (socket) => {
           if (parts[2]) duration = parseInt(parts[2]) * 1000;
           mutedUsers.set(target, Date.now() + duration);
           break;
-        case "/ban":
-          const cookieValue = `${target}-${Date.now()}`;
-          banned.set(target, cookieValue);
-          io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
-          socket.emit("ban-cookie", { user: target, cookie: cookieValue });
-          break;
       }
-      // also send command info to admin page
-      io.emit("admin-log", { user, message });
+
+      // Send command to admin page
+      io.emit("admin-log", { user, message, timestamp: Date.now() });
       return;
     }
 
@@ -127,11 +97,9 @@ io.on("connection", (socket) => {
       io.sockets.sockets.forEach(s => {
         if (s.user === targetUser || s.user === user || user === "DEV") {
           s.emit("whisper", { from: user, to: targetUser, message: msg });
+          io.emit("admin-log", { user: "WHISPER", message: `${user} → ${targetUser}: ${msg}`, timestamp: Date.now() });
         }
       });
-
-      // stream to admin
-      io.emit("admin-log", { user, message: `[whisper] ${msg}` });
       return;
     }
 
@@ -141,24 +109,19 @@ io.on("connection", (socket) => {
       const targetUser = lastWhisper.get(user);
       if (!targetUser) return;
       lastWhisper.set(targetUser, user);
+
       io.sockets.sockets.forEach(s => {
         if (s.user === targetUser || s.user === user || user === "DEV") {
           s.emit("whisper", { from: user, to: targetUser, message: msg });
+          io.emit("admin-log", { user: "REPLY", message: `${user} → ${targetUser}: ${msg}`, timestamp: Date.now() });
         }
       });
-
-      // stream to admin
-      io.emit("admin-log", { user, message: `[reply] ${msg}` });
       return;
     }
 
-    // regular message
-    const chatMsg = { user, message, timestamp: new Date().toISOString() };
-    messages.push(chatMsg);
-    io.emit("chat", chatMsg);
-
-    // stream to admin
-    io.emit("admin-log", chatMsg);
+    // Broadcast chat
+    io.emit("chat", { user, message, timestamp: Date.now() });
+    io.emit("admin-log", { user, message, timestamp: Date.now() });
   });
 
   socket.on("disconnect", () => {
