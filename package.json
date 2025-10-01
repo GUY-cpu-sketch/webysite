@@ -1,6 +1,7 @@
 {
   "name": "render-chat-app",
   "version": "1.0.0",
+  "description": "Realtime chat app with admin commands, whispers, and Postgres backend",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -8,7 +9,10 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "pg": "^8.12.0",
+    "pg": "^8.11.5",
     "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=22.x"
   }
 }
