@@ -1,19 +1,15 @@
 {
-  "name": "render-chat-app",
-  "version": "1.0.0",
-  "description": "Simple WebChat app with admin panel, in-memory storage, and Socket.IO",
-  "type": "module",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=22.0.0"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.8.1",
-    "cookie-parser": "^1.4.6",
-    "crypto": "^1.0.1"
-  }
+"name": "render-chat-app",
+"version": "2.0.0",
+"type": "module",
+"main": "server.js",
+"scripts": {
+"start": "node server.js"
+},
+"dependencies": {
+"express": "^4.18.2",
+"socket.io": "^4.7.1",
+"cookie-parser": "^1.4.6",
+"crypto-js": "^4.1.1"
+}
 }
