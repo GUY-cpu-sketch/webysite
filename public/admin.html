@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel</title>
+<style>
+body { font-family: Arial; margin: 0; padding: 20px; background: #f9f9f9; }
+#messages { max-width: 800px; margin: 0 auto 20px; border: 1px solid #ddd; padding: 10px; height: 400px; overflow-y: auto; background: #fff; }
+button { margin: 2px; }
+.whisper { color: orange; }
+.reply { color: purple; }
+</style>
+</head>
+<body>
+<h2>Admin Panel</h2>
+<div id="messages"></div>
+<input id="target" placeholder="Target username">
+<button id="muteBtn">Mute 1 min</button>
+<button id="banBtn">Ban</button>
+<button id="closeBtn">Disconnect</button>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const messagesEl = document.getElementById('messages');
+const targetInput = document.getElementById('target');
+
+function addMessage(data){
+  const p = document.createElement('p');
+  if(data.type === 'whisper') p.textContent = `${data.from} → ${data.to}: ${data.message}`;
+  else if(data.type === 'reply') p.textContent = `${data.from} replied to ${data.to}: ${data.message}`;
+  else p.textContent = `${data.user}: ${data.message}`;
+  
+  if(data.type) p.className = data.type;
+  messagesEl.appendChild(p);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+socket.on('admin-message', addMessage);
+
+document.getElementById('muteBtn').onclick = () => {
+  const user = targetInput.value;
+  socket.emit('chat', { user: 'DEV', message: `/mute ${user}` });
+};
+document.getElementById('banBtn').onclick = () => {
+  const user = targetInput.value;
+  socket.emit('chat', { user: 'DEV', message: `/ban ${user}` });
+};
+document.getElementById('closeBtn').onclick = () => {
+  const user = targetInput.value;
+  socket.emit('chat', { user: 'DEV', message: `/close ${user}` });
+};
+</script>
+</body>
+</html>
