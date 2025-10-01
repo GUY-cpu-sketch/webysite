@@ -1,65 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat</title>
+  <meta charset="UTF-8">
+  <title>Chat</title>
 </head>
 <body>
-<h1>Chat Room</h1>
-<div>
+  <h1>Chat Room</h1>
   <ul id="chatBox"></ul>
-</div>
-<input type="text" id="chatInput" placeholder="Message">
-<button id="sendBtn">Send</button>
+  <input type="text" id="chatInput" placeholder="Type a message">
+  <button id="sendBtn">Send</button>
 
-<h3>Online Users:</h3>
-<ul id="users"></ul>
+  <h3>Online Users</h3>
+  <ul id="users"></ul>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-const socket = io();
-const username = document.cookie.split("; ").find(c => c.startsWith("username="))?.split("=")[1];
-if (!username) location.href = "/";
-
-socket.emit("registerSocket", { username });
-
-const chatBox = document.getElementById("chatBox");
-const usersList = document.getElementById("users");
-
-socket.on("chat-history", (msgs) => {
-  chatBox.innerHTML = "";
-  msgs.forEach(m => addMessage(m));
-});
-
-socket.on("chat", addMessage);
-
-socket.on("whisper", ({ from, to, message }) => {
-  addMessage({ user: from, message: `[whisper to ${to}]: ${message}` });
-});
-
-socket.on("online-users", (list) => {
-  usersList.innerHTML = "";
-  list.forEach(u => {
-    const li = document.createElement("li");
-    li.textContent = u;
-    usersList.appendChild(li);
-  });
-});
-
-document.getElementById("sendBtn").addEventListener("click", () => {
-  const msg = document.getElementById("chatInput").value;
-  if (!msg) return;
-  socket.emit("chat", { user: username, message: msg });
-  document.getElementById("chatInput").value = "";
-});
-
-function addMessage({ user, message, timestamp }) {
-  const li = document.createElement("li");
-  li.textContent = timestamp ? `[${new Date(timestamp).toLocaleTimeString()}] ${user}: ${message}` : `${user}: ${message}`;
-  chatBox.appendChild(li);
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-</script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/main.js"></script>
 </body>
 </html>
