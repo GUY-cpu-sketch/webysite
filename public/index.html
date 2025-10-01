@@ -1,54 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Chat Landing</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Welcome - Chat App</title>
+<style>
+body { font-family: sans-serif; background-color: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+a { color: #fff; margin: 10px; display: inline-block; }
+#rules { max-width: 600px; margin-bottom: 20px; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Welcome to Chat</h1>
-
-    <div class="rules">
-      <h3>Rules</h3>
-      <ol>
-        <li>No spamming.</li>
-        <li>Respect other users.</li>
-        <li>No offensive language.</li>
-        <li>Follow admin instructions.</li>
-        <li>Use the chat responsibly.</li>
-      </ol>
-    </div>
-
-    <div class="agree-section">
-      <input type="checkbox" id="agreeRules">
-      <label for="agreeRules">I agree to follow the rules</label><br>
-      <button id="continueBtn" disabled>Continue</button>
-    </div>
-
-    <div class="auth-area" id="authLinks" style="display:none;">
-      <a href="login.html">Login</a>
-      <a href="register.html">Register</a>
-    </div>
-  </div>
-
-  <script src="main.js"></script>
-  <script>
-    const agreeCheckbox = document.getElementById("agreeRules");
-    const continueBtn = document.getElementById("continueBtn");
-    const authLinks = document.getElementById("authLinks");
-
-    agreeCheckbox.addEventListener("change", () => {
-      continueBtn.disabled = !agreeCheckbox.checked;
-    });
-
-    continueBtn.addEventListener("click", () => {
-      if (agreeCheckbox.checked) {
-        authLinks.style.display = "block";
-        continueBtn.style.display = "none";
-        agreeCheckbox.disabled = true;
-      }
-    });
-  </script>
+<div id="rules">
+<h2>Chat App Rules</h2>
+<ol>
+<li>Be respectful.</li>
+<li>No spamming.</li>
+<li>Follow admin instructions.</li>
+</ol>
+<label><input type="checkbox" id="agree"> I agree to the rules</label>
+</div>
+<div id="links" style="display:none;">
+<a href="login.html">Login</a>
+<a href="register.html">Register</a>
+</div>
+<script>
+document.getElementById('agree').addEventListener('change', e => {
+document.getElementById('links').style.display = e.target.checked ? 'block' : 'none';
+});
+</script>
 </body>
 </html>
