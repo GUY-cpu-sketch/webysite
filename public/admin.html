@@ -2,54 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel</title>
-<style>
-body { font-family: Arial; margin: 0; padding: 20px; background: #f9f9f9; }
-#messages { max-width: 800px; margin: 0 auto 20px; border: 1px solid #ddd; padding: 10px; height: 400px; overflow-y: auto; background: #fff; }
-button { margin: 2px; }
-.whisper { color: orange; }
-.reply { color: purple; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin</title>
 </head>
 <body>
-<h2>Admin Panel</h2>
-<div id="messages"></div>
-<input id="target" placeholder="Target username">
-<button id="muteBtn">Mute 1 min</button>
-<button id="banBtn">Ban</button>
-<button id="closeBtn">Disconnect</button>
+<h1>Admin Dashboard</h1>
+
+<h3>Chat / Commands Log:</h3>
+<ul id="log"></ul>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-const messagesEl = document.getElementById('messages');
-const targetInput = document.getElementById('target');
-
-function addMessage(data){
-  const p = document.createElement('p');
-  if(data.type === 'whisper') p.textContent = `${data.from} → ${data.to}: ${data.message}`;
-  else if(data.type === 'reply') p.textContent = `${data.from} replied to ${data.to}: ${data.message}`;
-  else p.textContent = `${data.user}: ${data.message}`;
-  
-  if(data.type) p.className = data.type;
-  messagesEl.appendChild(p);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+const cookie = document.cookie.split("; ").find(c => c.startsWith("admin="))?.split("=")[1];
+if (!cookie || cookie !== "ADMINSECRET") { // same as server adminCookie
+  document.body.innerHTML = "Forbidden";
 }
 
-socket.on('admin-message', addMessage);
-
-document.getElementById('muteBtn').onclick = () => {
-  const user = targetInput.value;
-  socket.emit('chat', { user: 'DEV', message: `/mute ${user}` });
-};
-document.getElementById('banBtn').onclick = () => {
-  const user = targetInput.value;
-  socket.emit('chat', { user: 'DEV', message: `/ban ${user}` });
-};
-document.getElementById('closeBtn').onclick = () => {
-  const user = targetInput.value;
-  socket.emit('chat', { user: 'DEV', message: `/close ${user}` });
-};
+const log = document.getElementById("log");
+socket.on("admin-log", (data) => {
+  const li = document.createElement("li");
+  if (data.timestamp) li.textContent = `[${new Date(data.timestamp).toLocaleTimeString()}] ${data.user}: ${data.message}`;
+  else li.textContent = `${data.user}: ${data.message}`;
+  log.appendChild(li);
+});
 </script>
 </body>
 </html>
