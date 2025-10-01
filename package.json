@@ -1,16 +1,17 @@
 {
   "name": "webysite",
   "version": "1.0.0",
+  "description": "Real-time chat app with admin commands",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "npm install"
   },
   "dependencies": {
+    "better-sqlite3": "^8.3.0",
     "express": "^4.18.2",
-    "sqlite": "^5.1.2",
-    "socket.io": "^4.7.2",
-    "cookie-parser": "^1.4.6",
-    "express-session": "^1.17.3",
-    "body-parser": "^1.20.2"
+    "socket.io": "^4.8.1",
+    "cookie-parser": "^1.4.6"
   }
 }
