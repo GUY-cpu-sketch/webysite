@@ -1,27 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Chat App</title>
-<style>
-  body {
-    background: #808080;
-    font-family: Arial, sans-serif;
-    color: white;
-  }
-  #messages div, #whispers div {
-    padding: 4px 6px;
-    margin: 2px 0;
-    border-radius: 4px;
-  }
-  .normal { background: #fff; color: black; }
-  .whisper { background: #ffff66; color: black; }
-  #admin-panel { background: #333; color: white; padding: 5px; }
-  #admin-panel h4 { margin: 2px 0; font-size: 14px; }
-</style>
-</head>
-<body>
-
 <div id="auth">
   <input id="username" placeholder="Username" />
   <input id="password" type="password" placeholder="Password" />
@@ -32,7 +8,7 @@
 <div id="chat" style="display:none;">
   <div style="display:flex;">
     <div id="messages" style="max-height:400px; overflow-y:auto; flex:3; margin-right:10px;"></div>
-    <div id="admin-panel" style="flex:1; max-height:400px; overflow-y:auto;">
+    <div id="admin-panel" style="flex:1; max-height:400px; overflow-y:auto; background:#333; color:white; padding:5px;">
       <h4>Admin Panel (DEV only)</h4>
       <div id="online-users"></div>
       <div id="whispers"></div>
@@ -40,6 +16,31 @@
   </div>
   <input id="input" placeholder="Message..." style="width:100%; margin-top:5px;" />
 </div>
+
+<style>
+  body {
+    background-color: #808080;
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+  #messages div, #whispers div {
+    padding: 4px 6px;
+    margin: 2px 0;
+    border-radius: 4px;
+  }
+  .normal {
+    background-color: #ffffff;
+    color: black;
+  }
+  .whisper {
+    background-color: #ffff66;
+    color: black;
+  }
+  #admin-panel h4 {
+    margin: 2px 0;
+    font-size: 14px;
+  }
+</style>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -57,8 +58,9 @@ const whispersDiv = document.getElementById("whispers");
 
 document.getElementById("register").onclick = async () => {
   const res = await fetch("/register", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username: usernameInput.value, password: passwordInput.value})
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
   });
   const data = await res.json();
   alert(data.success ? "Registered!" : data.msg);
@@ -66,18 +68,20 @@ document.getElementById("register").onclick = async () => {
 
 document.getElementById("login").onclick = async () => {
   const res = await fetch("/login", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username: usernameInput.value, password: passwordInput.value})
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
   });
   const data = await res.json();
   if (!data.success) return alert(data.msg);
   username = usernameInput.value;
-  authDiv.style.display="none";
-  chatDiv.style.display="block";
+  authDiv.style.display = "none";
+  chatDiv.style.display = "block";
+
   socket.emit("registerSocket", { username });
 };
 
-socket.on("chat-history", msgs => msgs.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
+socket.on("chat-history", messages => messages.forEach(m => appendMessage(`${m.user}: ${m.message}`, 'normal')));
 socket.on("chat", data => appendMessage(`${data.user}: ${data.message}`, 'normal'));
 socket.on("whisper", data => {
   appendMessage(`[Whisper] ${data.from} -> ${data.to}: ${data.message}`, 'whisper');
@@ -101,19 +105,17 @@ socket.on("ban-cookie", data => {
 });
 
 input.addEventListener("keypress", e => {
-  if(e.key==="Enter" && input.value.trim()){
+  if (e.key === "Enter" && input.value.trim()) {
     socket.emit("chat", { user: username, message: input.value.trim() });
-    input.value="";
+    input.value = "";
   }
 });
 
-function appendMessage(msg,type){
-  const div=document.createElement("div");
-  div.textContent=msg;
-  div.className=type;
+function appendMessage(msg, type) {
+  const div = document.createElement("div");
+  div.textContent = msg;
+  div.className = type;
   messagesDiv.appendChild(div);
-  messagesDiv.scrollTop=messagesDiv.scrollHeight;
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 </script>
-</body>
-</html>
