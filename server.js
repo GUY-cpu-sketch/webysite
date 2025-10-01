@@ -4,162 +4,191 @@ import { Server } from "socket.io";
 import pkg from "pg";
 
 const { Pool } = pkg;
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use(express.static("public"));
+app.use(express.json());
+
+// --- PostgreSQL connection ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-app.use(express.static("public"));
+// --- Create table if not exists ---
+(async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE,
+      password TEXT,
+      is_admin BOOLEAN DEFAULT false
+    );
+  `);
+})();
 
-async function initDb() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password TEXT
-  )`);
+// --- In-memory state for whispers ---
+const onlineUsers = {}; // socket.id → username
+const lastWhispers = {}; // username → last sender
 
-  await pool.query(`CREATE TABLE IF NOT EXISTS messages (
-    id SERIAL PRIMARY KEY,
-    username TEXT,
-    message TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`);
+// --- Register endpoint ---
+app.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    await pool.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2)",
+      [username, password]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Register error:", err);
+    res.json({ success: false, error: "Username already taken" });
+  }
+});
 
-  await pool.query(`CREATE TABLE IF NOT EXISTS banned (
-    username TEXT PRIMARY KEY,
-    cookie TEXT
-  )`);
-}
-
-initDb();
-
-// store muted users in memory
-const muted = new Map();
-
-io.on("connection", (socket) => {
-  let username = null;
-
-  socket.on("register", async (data, cb) => {
-    const { username: u, password } = data;
-    try {
-      await pool.query("INSERT INTO users(username,password) VALUES($1,$2)", [u, password]);
-      cb({ success: true });
-    } catch (e) {
-      cb({ success: false, error: "Username taken" });
-    }
-  });
-
-  socket.on("login", async (data, cb) => {
-    const { username: u, password } = data;
-    const res = await pool.query("SELECT * FROM users WHERE username=$1 AND password=$2", [u, password]);
-    if (res.rows.length > 0) {
-      username = u;
-
-      // check ban
-      const banCheck = await pool.query("SELECT * FROM banned WHERE username=$1", [u]);
-      if (banCheck.rows.length > 0) {
-        cb({ success: false, error: "You are banned." });
-        return;
-      }
-
-      const messages = await pool.query("SELECT * FROM messages ORDER BY id DESC LIMIT 50");
-      cb({ success: true, history: messages.rows.reverse() });
-
-      io.emit("system", `${username} joined`);
+// --- Login endpoint ---
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE username=$1 AND password=$2",
+      [username, password]
+    );
+    if (result.rows.length > 0) {
+      res.json({ success: true, isAdmin: result.rows[0].is_admin });
     } else {
-      cb({ success: false, error: "Invalid credentials" });
+      res.json({ success: false });
     }
+  } catch (err) {
+    console.error("Login error:", err);
+    res.json({ success: false });
+  }
+});
+
+// --- Socket.io chat ---
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("login", (username) => {
+    onlineUsers[socket.id] = username;
+    io.emit("system", `${username} joined the chat`);
   });
 
-  socket.on("chat", async (data) => {
-    if (!username) return;
-    if (muted.has(username) && Date.now() < muted.get(username)) {
-      socket.emit("system", "You are muted.");
+  socket.on("chat", (msg) => {
+    const username = onlineUsers[socket.id] || "Unknown";
+    if (!msg.startsWith("/")) {
+      io.emit("chat", { user: username, message: msg, whisper: false });
       return;
     }
 
-    const { message } = data;
+    // --- Handle commands ---
+    const parts = msg.split(" ");
+    const command = parts[0].toLowerCase();
 
-    // --- Commands ---
-    if (message.startsWith("/")) {
-      const parts = message.split(" ");
-      const cmd = parts[0].toLowerCase();
+    if (command === "/whisper" && parts.length >= 3) {
+      const targetUser = parts[1];
+      const whisperMsg = parts.slice(2).join(" ");
 
-      // admin check
-      const isAdmin = username === "DEV";
+      // find target socket
+      const targetSocketId = Object.keys(onlineUsers).find(
+        (id) => onlineUsers[id] === targetUser
+      );
 
-      if (cmd === "/whisper") {
-        const target = parts[1];
-        const msg = parts.slice(2).join(" ");
-        for (let [id, s] of io.sockets.sockets) {
-          if (s.username === target || s.username === username) {
-            s.emit("whisper", { from: username, to: target, message: msg });
+      if (targetSocketId) {
+        // send to sender + target
+        socket.emit("chat", {
+          user: username,
+          message: `(whisper to ${targetUser}) ${whisperMsg}`,
+          whisper: true,
+        });
+        io.to(targetSocketId).emit("chat", {
+          user: username,
+          message: `(whisper) ${whisperMsg}`,
+          whisper: true,
+        });
+
+        // record last whisper
+        lastWhispers[targetUser] = username;
+        lastWhispers[username] = targetUser;
+
+        // broadcast to admins (snoop mode)
+        for (const [id, user] of Object.entries(onlineUsers)) {
+          pool.query("SELECT is_admin FROM users WHERE username=$1", [user])
+            .then((result) => {
+              if (result.rows.length > 0 && result.rows[0].is_admin) {
+                io.to(id).emit("chat", {
+                  user: username,
+                  message: `(whisper to ${targetUser}) ${whisperMsg}`,
+                  whisper: true,
+                });
+              }
+            });
+        }
+      } else {
+        socket.emit("chat", {
+          user: "SYSTEM",
+          message: `User ${targetUser} not found.`,
+          whisper: true,
+        });
+      }
+    } else if (command === "/reply" && parts.length >= 2) {
+      const replyMsg = parts.slice(1).join(" ");
+      const lastUser = lastWhispers[username];
+
+      if (lastUser) {
+        const targetSocketId = Object.keys(onlineUsers).find(
+          (id) => onlineUsers[id] === lastUser
+        );
+
+        if (targetSocketId) {
+          socket.emit("chat", {
+            user: username,
+            message: `(reply to ${lastUser}) ${replyMsg}`,
+            whisper: true,
+          });
+          io.to(targetSocketId).emit("chat", {
+            user: username,
+            message: `(reply) ${replyMsg}`,
+            whisper: true,
+          });
+
+          // broadcast to admins
+          for (const [id, user] of Object.entries(onlineUsers)) {
+            pool.query("SELECT is_admin FROM users WHERE username=$1", [user])
+              .then((result) => {
+                if (result.rows.length > 0 && result.rows[0].is_admin) {
+                  io.to(id).emit("chat", {
+                    user: username,
+                    message: `(reply to ${lastUser}) ${replyMsg}`,
+                    whisper: true,
+                  });
+                }
+              });
           }
         }
-        return;
+      } else {
+        socket.emit("chat", {
+          user: "SYSTEM",
+          message: "No recent whisper to reply to.",
+          whisper: true,
+        });
       }
-
-      if (cmd === "/reply") {
-        const msg = parts.slice(1).join(" ");
-        // store last whisper target in memory
-        if (socket.lastWhisperFrom) {
-          for (let [id, s] of io.sockets.sockets) {
-            if (s.username === socket.lastWhisperFrom || s.username === username) {
-              s.emit("whisper", { from: username, to: socket.lastWhisperFrom, message: msg });
-            }
-          }
-        } else {
-          socket.emit("system", "No whisper to reply to.");
-        }
-        return;
-      }
-
-      if (isAdmin) {
-        if (cmd === "/mute") {
-          const target = parts[1];
-          const time = parseInt(parts[2]) || 60;
-          const until = Date.now() + time * 1000;
-          muted.set(target, until);
-          io.emit("system", `${target} muted for ${time}s by admin.`);
-          return;
-        }
-
-        if (cmd === "/ban") {
-          const target = parts[1];
-          await pool.query("INSERT INTO banned(username,cookie) VALUES($1,$2) ON CONFLICT(username) DO UPDATE SET cookie=$2", [target, "blocked"]);
-          io.emit("system", `${target} was banned.`);
-          return;
-        }
-
-        if (cmd === "/close") {
-          const target = parts[1];
-          for (let [id, s] of io.sockets.sockets) {
-            if (s.username === target) {
-              s.emit("force-close");
-              s.disconnect(true);
-            }
-          }
-          io.emit("system", `${target}'s chat was closed by admin.`);
-          return;
-        }
-      }
-      return;
     }
-
-    // Normal message
-    await pool.query("INSERT INTO messages(username,message) VALUES($1,$2)", [username, message]);
-    io.emit("chat", { username, message });
   });
 
   socket.on("disconnect", () => {
-    if (username) io.emit("system", `${username} left`);
+    const username = onlineUsers[socket.id];
+    if (username) {
+      io.emit("system", `${username} left the chat`);
+      delete onlineUsers[socket.id];
+    }
   });
-
-  socket.username = username;
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
