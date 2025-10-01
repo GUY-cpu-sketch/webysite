@@ -2,43 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Welcome</title>
+<title>Chat</title>
 <style>
-  body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
-  a { color: #fff; display: block; margin: 10px; text-decoration: underline; }
-  #rules { max-width: 600px; margin: 0 auto 20px; text-align: left; }
+  #chatBox { border: 1px solid #000; height: 300px; overflow-y: scroll; padding: 10px; }
 </style>
 </head>
 <body>
-<h1>Welcome to the Chat App</h1>
-<div id="rules">
-  <h3>Rules:</h3>
-  <ul>
-    <li>No spamming</li>
-    <li>Respect others</li>
-    <li>No NSFW content</li>
-    <li>Admins can moderate chat</li>
-  </ul>
-</div>
-<label>
-  <input type="checkbox" id="agreeRules"> I agree to the rules
-</label>
-<div id="links" style="display:none;">
-  <a href="login.html">Login</a>
-  <a href="register.html">Register</a>
-  <a href="admin.html" id="adminLink" style="display:none;">Admin</a>
-</div>
+<h2>Chat</h2>
+<div id="chatBox"></div>
+<form id="chatForm">
+  <input type="text" id="chatInput" placeholder="Message">
+  <button type="submit">Send</button>
+</form>
 
+<script src="/socket.io/socket.io.js"></script>
 <script src="main.js"></script>
-<script>
-  document.getElementById('agreeRules').addEventListener('change', e => {
-    document.getElementById('links').style.display = e.target.checked ? 'block' : 'none';
-  });
-
-  // Show admin link only if cookie says admin
-  if (document.cookie.includes('admin=true')) {
-    document.getElementById('adminLink').style.display = 'block';
-  }
-</script>
 </body>
 </html>
