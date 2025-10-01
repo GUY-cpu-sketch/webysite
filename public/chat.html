@@ -15,5 +15,19 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/main.js"></script>
+  <script>
+  const cookies = document.cookie.split("; ").reduce((acc, cur) => {
+    const [k, v] = cur.split("=");
+    acc[k] = v;
+    return acc;
+  }, {});
+
+  if (cookies.admin) {
+    const adminLink = document.createElement("a");
+    adminLink.href = "admin.html";
+    adminLink.textContent = "Admin Panel";
+    document.body.prepend(adminLink);
+  }
+</script>
 </body>
 </html>
