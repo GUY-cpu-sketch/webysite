@@ -3,67 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Chat Landing</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f2f2f2;
-      margin: 0;
-      padding: 0;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 50px auto;
-      padding: 20px;
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-    }
-
-    h1 {
-      text-align: center;
-    }
-
-    .rules {
-      background-color: #eee;
-      padding: 15px;
-      border-radius: 5px;
-      margin-bottom: 20px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .agree-section {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .auth-area {
-      background-color: black;
-      color: white;
-      padding: 20px;
-      text-align: center;
-      border-radius: 8px;
-    }
-
-    .auth-area a {
-      color: white;
-      text-decoration: none;
-      font-weight: bold;
-      margin: 0 10px;
-    }
-
-    .auth-area a:hover {
-      text-decoration: underline;
-    }
-
-    button {
-      margin-top: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
@@ -92,6 +32,7 @@
     </div>
   </div>
 
+  <script src="main.js"></script>
   <script>
     const agreeCheckbox = document.getElementById("agreeRules");
     const continueBtn = document.getElementById("continueBtn");
