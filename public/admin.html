@@ -1,19 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Admin Panel</title>
-<style>
-  body { font-family:sans-serif; }
-  #chatBox { border:1px solid black; height:300px; overflow-y:auto; margin-bottom:10px; padding:5px; }
-</style>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<h2>Admin Panel</h2>
-<div id="chatBox"></div>
-<h3>Online Users:</h3>
-<ul id="onlineUsers"></ul>
-<script src="/socket.io/socket.io.js"></script>
-<script src="main.js"></script>
+<body style="background:#222; color:white;">
+  <h2>Admin Panel</h2>
+  <div id="adminBox" style="height:400px; overflow-y:auto; border:1px solid white; padding:10px;"></div>
+  <form id="adminCmdForm">
+    <input type="text" id="adminCmdInput" placeholder="Enter command..." autocomplete="off">
+    <button type="submit">Run</button>
+  </form>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
