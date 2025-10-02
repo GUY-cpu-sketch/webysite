@@ -1,55 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Welcome</title>
-  <style>
-    body {
-      background-color: black;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-    .rules {
-      max-width: 600px;
-      margin: 20px auto;
-      text-align: left;
-      background: #222;
-      padding: 15px;
-      border-radius: 8px;
-    }
-    a {
-      color: white;
-      display: block;
-      margin: 10px;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    .hidden {
-      display: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Landing Page</title>
+<style>
+  body { background: black; color: white; font-family: sans-serif; text-align: center; }
+  .links a { color: white; margin: 10px; display: inline-block; }
+</style>
 </head>
 <body>
-  <h1>Welcome to the Chat!</h1>
-  <div class="rules">
-    <h2>Rules</h2>
-    <ul>
-      <li>No spam</li>
-      <li>No harassment</li>
-      <li>Respect others</li>
-      <li>Admins have final say</li>
-    </ul>
-  </div>
-  <label>
-    <input type="checkbox" id="agreeBox"> I agree to the rules
-  </label>
-  <div id="links" class="hidden">
-    <a href="login.html">Login</a>
-    <a href="register.html">Register</a>
-    <a href="chat.html">Enter Chat</a>
-    <a href="admin.html" id="adminLink" class="hidden">Admin Panel</a>
-  </div>
-  <script src="main.js"></script>
+<h1>Welcome to Chat App</h1>
+<div>
+  <p>Please read and agree to our rules:</p>
+  <ul style="text-align:left; display:inline-block;">
+    <li>No spamming.</li>
+    <li>No hate speech.</li>
+    <li>Be respectful to everyone.</li>
+  </ul>
+  <br>
+  <input type="checkbox" id="agree"> I agree to the rules
+</div>
+<div class="links" style="display:none;">
+  <a href="login.html">Login</a>
+  <a href="register.html">Register</a>
+</div>
+<script>
+  const agree = document.getElementById("agree");
+  const links = document.querySelector(".links");
+  agree.addEventListener("change", () => {
+    links.style.display = agree.checked ? "block" : "none";
+  });
+
+  // Show admin link only if cookie is present
+  if (document.cookie.includes("admin=true")) {
+    const adminLink = document.createElement("a");
+    adminLink.href = "admin.html";
+    adminLink.textContent = "Admin Panel";
+    links.appendChild(adminLink);
+  }
+</script>
 </body>
 </html>
