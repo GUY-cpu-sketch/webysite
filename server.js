@@ -1,63 +1,159 @@
 import express from "express";
-case "/close":
-io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
-break;
-case "/mute":
-let duration = 60000;
-if (parts[2]) duration = parseInt(parts[2]) * 1000;
-mutedUsers.set(target, Date.now() + duration);
-break;
-case "/ban":
-const cookieValue = `${target}-${Date.now()}`;
-bannedUsers.set(target, cookieValue);
-io.sockets.sockets.forEach(s => { if (s.user === target) s.disconnect(true); });
-socket.emit("ban-cookie", { user: target, cookie: cookieValue });
-break;
-}
-return;
-}
+import http from "http";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Whisper
-if (message.startsWith("/whisper ")) {
-const parts = message.split(" ");
-const targetUser = parts[1];
-const msg = parts.slice(2).join(" ");
-lastWhisper.set(targetUser, user);
-io.sockets.sockets.forEach(s => {
-if (s.user === targetUser || s.user === user || user === "DEV") s.emit("whisper", { from: user, to: targetUser, message: msg });
-});
-adminSockets.forEach(s => s.emit("whisper", { from: user, to: targetUser, message: msg }));
-return;
-}
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.json());
 
-// Reply
-if (message.startsWith("/reply ")) {
-const msg = message.slice(7);
-const targetUser = lastWhisper.get(user);
-if (!targetUser) return;
-lastWhisper.set(targetUser, user);
-io.sockets.sockets.forEach(s => {
-if (s.user === targetUser || s.user === user || user === "DEV") s.emit("whisper", { from: user, to: targetUser, message: msg });
-});
-adminSockets.forEach(s => s.emit("whisper", { from: user, to: targetUser, message: msg }));
-return;
-}
+// --- In-memory storage ---
+let users = {}; // { username: socketId }
+let admins = new Set(["DEV"]); // default admin
+let mutedUsers = {}; // { username: untilTimestamp }
+let bannedUsers = new Set();
+let lastWhispers = {}; // track last whisper target
 
+// --- Simple register/login (in-memory, NOT secure for prod) ---
+let accounts = {}; // { username: password }
 
-messages.push({ user, message });
-io.emit("chat", { user, message });
-adminSockets.forEach(s => s.emit("chat", { user, message }));
+app.post("/register", (req, res) => {
+  const { username, password } = req.body;
+  if (accounts[username]) return res.status(400).json({ error: "User exists" });
+  accounts[username] = password;
+  res.json({ success: true });
 });
 
-
-socket.on("disconnect", () => {
-onlineUsers.delete(socket.id);
-io.emit("online-users", Array.from(onlineUsers.values()));
-if (isAdmin) adminSockets.delete(socket);
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+  if (accounts[username] !== password) {
+    return res.status(400).json({ error: "Invalid login" });
+  }
+  res.json({ success: true });
 });
+
+// --- Socket.IO ---
+io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
+
+  socket.on("setUsername", (username) => {
+    if (bannedUsers.has(username)) {
+      socket.emit("banned");
+      socket.disconnect();
+      return;
+    }
+    socket.username = username;
+    users[username] = socket.id;
+    io.emit("system", `${username} joined the chat.`);
+  });
+
+  socket.on("chat message", (msg) => {
+    if (!socket.username) return;
+
+    // Check mute
+    if (mutedUsers[socket.username] && mutedUsers[socket.username] > Date.now()) {
+      socket.emit("system", "You are muted.");
+      return;
+    }
+
+    // Handle commands
+    if (msg.startsWith("/")) {
+      const parts = msg.split(" ");
+      const command = parts[0];
+      const targetUser = parts[1];
+      const arg = parts.slice(2).join(" ");
+
+      switch (command) {
+        case "/close":
+          if (socket.username === "DEV") {
+            if (users[targetUser]) {
+              io.to(users[targetUser]).emit("forceClose");
+            }
+          }
+          break;
+
+        case "/mute":
+          if (socket.username === "DEV") {
+            const duration = parseInt(arg) || 60;
+            mutedUsers[targetUser] = Date.now() + duration * 1000;
+            if (users[targetUser]) {
+              io.to(users[targetUser]).emit("muted", duration);
+            }
+          }
+          break;
+
+        case "/ban":
+          if (socket.username === "DEV") {
+            bannedUsers.add(targetUser);
+            if (users[targetUser]) {
+              io.to(users[targetUser]).emit("banned");
+              io.sockets.sockets.get(users[targetUser])?.disconnect();
+            }
+          }
+          break;
+
+        case "/whisper":
+          const toUser = parts[1];
+          const privateMsg = parts.slice(2).join(" ");
+          if (users[toUser]) {
+            io.to(users[toUser]).emit("whisper", {
+              from: socket.username,
+              message: privateMsg
+            });
+            lastWhispers[toUser] = socket.username;
+
+            // admins see whispers
+            for (let u in users) {
+              if (admins.has(u)) {
+                io.to(users[u]).emit("adminWhisper", {
+                  from: socket.username,
+                  to: toUser,
+                  message: privateMsg
+                });
+              }
+            }
+          }
+          break;
+
+        case "/reply":
+          if (lastWhispers[socket.username]) {
+            const replyMsg = parts.slice(1).join(" ");
+            const lastFrom = lastWhispers[socket.username];
+            if (users[lastFrom]) {
+              io.to(users[lastFrom]).emit("whisper", {
+                from: socket.username,
+                message: replyMsg
+              });
+            }
+          }
+          break;
+
+        default:
+          socket.emit("system", "Unknown command.");
+      }
+      return;
+    }
+
+    // Normal chat
+    io.emit("chat message", { user: socket.username, text: msg });
+  });
+
+  socket.on("disconnect", () => {
+    if (socket.username) {
+      delete users[socket.username];
+      io.emit("system", `${socket.username} left the chat.`);
+    }
+  });
 });
 
-
-server.listen(process.env.PORT || 3000, () => console.log("Server running"));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
