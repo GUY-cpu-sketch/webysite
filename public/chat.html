@@ -1,23 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Chat</title>
-<style>
-  #chatBox { border: 1px solid black; height: 300px; overflow-y: auto; margin-bottom: 10px; padding: 5px; }
-  #onlineUsers { list-style:none; padding-left:0; }
-</style>
+  <meta charset="UTF-8">
+  <title>Chat</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<h2>Chat Room</h2>
-<div id="chatBox"></div>
-<form id="chatForm">
-  <input type="text" id="chatInput" required placeholder="Type a message">
-  <button type="submit">Send</button>
-</form>
-<h3>Online Users:</h3>
-<ul id="onlineUsers"></ul>
-<script src="/socket.io/socket.io.js"></script>
-<script src="main.js"></script>
+<body style="background:black; color:white;">
+  <h2>Chat Room</h2>
+  <div id="chatBox" style="height:300px; overflow-y:auto; border:1px solid white; padding:10px;"></div>
+  <form id="chatForm">
+    <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off">
+    <button type="submit">Send</button>
+  </form>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
