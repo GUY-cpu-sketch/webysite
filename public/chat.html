@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Chat</title>
+  <title>Admin Panel</title>
   <style>
-    body { background: #444; color: white; font-family: Arial, sans-serif; }
-    #chatBox { border: 1px solid #777; padding: 10px; height: 300px; overflow-y: scroll; background: #222; }
-    .whisper { background: yellow; color: black; padding: 2px 4px; border-radius: 3px; }
-    .system { color: #aaa; font-style: italic; }
+    body { background: #111; color: white; font-family: Arial, sans-serif; }
+    #adminBox { border: 1px solid #777; padding: 10px; height: 300px; overflow-y: scroll; background: #222; }
+    button { margin: 5px; }
   </style>
 </head>
 <body>
-  <h2>Chat Room</h2>
-  <div id="chatBox"></div>
-  <form id="chatForm">
-    <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off">
-    <button type="submit">Send</button>
-  </form>
+  <h2>Admin Panel</h2>
+  <div id="adminBox"></div>
+  <div>
+    <button onclick="sendCommand('/close USERNAME')">Close User</button>
+    <button onclick="sendCommand('/mute USERNAME 60')">Mute 60s</button>
+    <button onclick="sendCommand('/ban USERNAME')">Ban User</button>
+  </div>
   <p><a href="index.html">Back</a></p>
   <script src="/socket.io/socket.io.js"></script>
   <script src="main.js"></script>
