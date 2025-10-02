@@ -1,78 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Panel</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
+<style>
+  #chatBox { border: 1px solid #000; height: 300px; overflow-y: scroll; padding: 10px; }
+  button { margin: 5px; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Admin Panel</h1>
-    <div id="adminControls">
-      <h3>Commands</h3>
-      <input type="text" id="targetUser" placeholder="Target username">
-      <input type="number" id="duration" placeholder="Duration (sec)">
-      <button id="muteBtn">Mute</button>
-      <button id="banBtn">Ban</button>
-      <button id="closeBtn">Disconnect</button>
-    </div>
+<h2>Admin Dashboard</h2>
+<div id="chatBox"></div>
 
-    <h3>Chat Messages</h3>
-    <div id="adminChat" class="chat-box"></div>
+<h3>Admin Commands</h3>
+<input type="text" id="targetUser" placeholder="Target username">
+<button id="muteBtn">Mute</button>
+<button id="banBtn">Ban</button>
+<button id="kickBtn">Kick</button>
 
-    <p><a href="chat.html">Go to Chat</a></p>
-  </div>
-
-  <script src="main.js"></script>
-  <script>
-    // Check admin cookie
-    const cookies = document.cookie.split("; ").reduce((acc, cur) => {
-      const [k, v] = cur.split("=");
-      acc[k] = v;
-      return acc;
-    }, {});
-    if (!cookies.admin) {
-      alert("Access denied: Admins only");
-      window.location.href = "index.html";
-    }
-
-    const socket = io();
-
-    // Run commands buttons
-    const targetInput = document.getElementById("targetUser");
-    const durationInput = document.getElementById("duration");
-    document.getElementById("muteBtn").addEventListener("click", () => {
-      const target = targetInput.value;
-      const dur = durationInput.value || 60;
-      socket.emit("chat", { user: "DEV", message: `/mute ${target} ${dur}` });
-    });
-
-    document.getElementById("banBtn").addEventListener("click", () => {
-      const target = targetInput.value;
-      socket.emit("chat", { user: "DEV", message: `/ban ${target}` });
-    });
-
-    document.getElementById("closeBtn").addEventListener("click", () => {
-      const target = targetInput.value;
-      socket.emit("chat", { user: "DEV", message: `/close ${target}` });
-    });
-
-    // Stream all chat messages to admin
-    const adminChat = document.getElementById("adminChat");
-    socket.on("chat", (data) => {
-      const p = document.createElement("p");
-      p.textContent = `${data.user}: ${data.message}`;
-      adminChat.appendChild(p);
-      adminChat.scrollTop = adminChat.scrollHeight;
-    });
-
-    // Whispers and replies
-    socket.on("whisper", (data) => {
-      const p = document.createElement("p");
-      p.textContent = `[WHISPER] ${data.from} -> ${data.to}: ${data.message}`;
-      adminChat.appendChild(p);
-      adminChat.scrollTop = adminChat.scrollHeight;
-    });
-  </script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="main.js"></script>
+<script>
+  // Only allow access if admin cookie is set
+  if (!document.cookie.includes('admin=true')) {
+    alert('Access denied');
+    window.location.href = 'index.html';
+  }
+</script>
 </body>
 </html>
