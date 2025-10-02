@@ -1,44 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Welcome</title>
-<style>
-  body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
-  a { color: #fff; display: block; margin: 10px; text-decoration: underline; }
-  #rules { max-width: 600px; margin: 0 auto 20px; text-align: left; }
-</style>
+  <meta charset="UTF-8">
+  <title>Welcome</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .rules {
+      max-width: 600px;
+      margin: 20px auto;
+      text-align: left;
+      background: #222;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    a {
+      color: white;
+      display: block;
+      margin: 10px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-<h1>Welcome to the Chat App</h1>
-<div id="rules">
-  <h3>Rules:</h3>
-  <ul>
-    <li>No spamming</li>
-    <li>Respect others</li>
-    <li>No NSFW content</li>
-    <li>Admins can moderate chat</li>
-  </ul>
-</div>
-<label>
-  <input type="checkbox" id="agreeRules"> I agree to the rules
-</label>
-<div id="links" style="display:none;">
-  <a href="login.html">Login</a>
-  <a href="register.html">Register</a>
-  <a href="admin.html" id="adminLink" style="display:none;">Admin</a>
-</div>
-
-<script src="main.js"></script>
-<script>
-  document.getElementById('agreeRules').addEventListener('change', e => {
-    document.getElementById('links').style.display = e.target.checked ? 'block' : 'none';
-  });
-
-  // Show admin link only if cookie says admin
-  if (document.cookie.includes('admin=true')) {
-    document.getElementById('adminLink').style.display = 'block';
-  }
-</script>
+  <h1>Welcome to the Chat!</h1>
+  <div class="rules">
+    <h2>Rules</h2>
+    <ul>
+      <li>No spam</li>
+      <li>No harassment</li>
+      <li>Respect others</li>
+      <li>Admins have final say</li>
+    </ul>
+  </div>
+  <label>
+    <input type="checkbox" id="agreeBox"> I agree to the rules
+  </label>
+  <div id="links" class="hidden">
+    <a href="login.html">Login</a>
+    <a href="register.html">Register</a>
+    <a href="chat.html">Enter Chat</a>
+    <a href="admin.html" id="adminLink" class="hidden">Admin Panel</a>
+  </div>
+  <script src="main.js"></script>
 </body>
 </html>
